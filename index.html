@@ -118,4 +118,204 @@
 
             <div class="space-y-0.5 text-xs border-r border-gray-700/80 pr-6">
                 <div class="flex justify-between gap-4"><span class="text-gray-400">HDG</span><span id="telemetry-hdg" class="font-bold text-white">075°</span></div>
-                <div class="flex justify-between gap-4"><span class="text-gray-400">COG</span><span id="telemetry-cog" class="font-bold text-white">075°</span>
+                <div class="flex justify-between gap-4"><span class="text-gray-400">COG</span><span id="telemetry-cog" class="font-bold text-white">075°</span></div>
+            </div>
+
+            <div class="space-y-0.5 text-xs">
+                <div class="flex justify-between gap-6"><span class="text-gray-400">BS</span><span id="telemetry-bs" class="font-bold text-emerald-400">13.7 kn</span></div>
+                <div class="flex justify-between gap-6"><span class="text-gray-400">SOG</span><span id="telemetry-sog" class="font-bold text-white">13.6 kn</span></div>
+            </div>
+        </div>
+
+        <!-- SAIL TRIM -->
+        <div class="hud-panel w-40 h-40 p-2 pointer-events-auto flex flex-col items-center justify-center relative">
+            <div class="text-[10px] font-sans font-bold text-gray-400 absolute top-1.5 left-2">VELE / TRIM</div>
+            <canvas id="sailTrimCanvas" width="140" height="140" class="w-full h-full"></canvas>
+        </div>
+    </div>
+
+    <!-- CONTROLS HELP -->
+    <div class="absolute bottom-48 left-4 z-10 pointer-events-auto opacity-75">
+        <div class="hud-panel px-3 py-2 text-[10px] text-gray-300 space-y-1 font-mono">
+            <div><kbd class="px-1 bg-gray-700 rounded">A</kbd> / <kbd class="px-1 bg-gray-700 rounded">D</kbd> : Timone (Orza/Poggia)</div>
+            <div><kbd class="px-1 bg-gray-700 rounded">W</kbd> / <kbd class="px-1 bg-gray-700 rounded">S</kbd> : Cazza / Lasca Randa</div>
+        </div>
+    </div>
+
+    <script>
+        // --- GAME ENGINE NATIVO HTML5 ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const state = {
+            heading: 75,
+            boatSpeed: 13.7,
+            sailTrim: 0.5,
+            timeSec: 617.22,
+            twd: 242
+        };
+
+        const opponents = [
+            { id: 'ky2', name: '🇨🇦 ky2', x: 80, y: -120, heading: 72, color: '#ef4444' },
+            { id: 'NiceWater', name: '🇺🇸 NiceWater', x: 0, y: 0, heading: 75, isPlayer: true, color: '#38bdf8' },
+            { id: 'WhoHappened', name: '🇺🇸 WhoHappened', x: -60, y: 90, heading: 77, color: '#ef4444' },
+            { id: 'Joe', name: '🇺🇸 Joe', x: -220, y: -80, heading: 70, color: '#ef4444' }
+        ];
+
+        // INPUTS
+        const keys = {};
+        window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+        window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+        // HUD CANVASES
+        const radarCanvas = document.getElementById('radarCanvas');
+        const radarCtx = radarCanvas.getContext('2d');
+        const compassCanvas = document.getElementById('compassCanvas');
+        const compassCtx = compassCanvas.getContext('2d');
+        const sailCanvas = document.getElementById('sailTrimCanvas');
+        const sailCtx = sailCanvas.getContext('2d');
+
+        function drawBoat(x, y, heading, scale, color, name) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate((heading - 90) * Math.PI / 180);
+
+            // Scafo Prospettico
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(25 * scale, 0);
+            ctx.quadraticCurveTo(0, -10 * scale, -25 * scale, -8 * scale);
+            ctx.lineTo(-25 * scale, 8 * scale);
+            ctx.quadraticCurveTo(0, 10 * scale, 25 * scale, 0);
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Vele
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+            ctx.beginPath();
+            ctx.moveTo(5 * scale, 0);
+            ctx.lineTo(-20 * scale, -14 * scale);
+            ctx.lineTo(-15 * scale, 0);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.restore();
+
+            // Nome sopra la barca
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 11px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(name, x, y - 22 * scale);
+        }
+
+        function updateUI() {
+            // Radar
+            radarCtx.fillStyle = '#06101e';
+            radarCtx.fillRect(0, 0, 128, 128);
+            radarCtx.strokeStyle = 'rgba(255,255,255,0.2)';
+            radarCtx.beginPath(); radarCtx.arc(64, 64, 40, 0, Math.PI*2); radarCtx.stroke();
+            
+            const player = opponents.find(o => o.isPlayer);
+            opponents.forEach(op => {
+                const rx = 64 + (op.x - player.x) * 0.3;
+                const ry = 64 + (op.y - player.y) * 0.3;
+                radarCtx.fillStyle = op.isPlayer ? '#38bdf8' : '#ef4444';
+                radarCtx.beginPath(); radarCtx.arc(rx, ry, 3, 0, Math.PI*2); radarCtx.fill();
+            });
+
+            // Compass
+            compassCtx.clearRect(0, 0, 136, 136);
+            compassCtx.save();
+            compassCtx.translate(68, 68);
+            compassCtx.rotate(-state.heading * Math.PI / 180);
+            compassCtx.strokeStyle = '#fff';
+            compassCtx.beginPath(); compassCtx.arc(0, 0, 50, 0, Math.PI*2); compassCtx.stroke();
+            compassCtx.fillStyle = '#fff'; compassCtx.font = '10px monospace'; compassCtx.fillText('N', -3, -38);
+            compassCtx.restore();
+
+            // Sail Trim
+            sailCtx.clearRect(0, 0, 140, 140);
+            sailCtx.strokeStyle = '#fff';
+            sailCtx.beginPath(); sailCtx.ellipse(70, 70, 12, 36, 0, 0, Math.PI*2); sailCtx.stroke();
+            const sa = (state.sailTrim - 0.5) * 1.2;
+            sailCtx.strokeStyle = '#22c55e'; sailCtx.lineWidth = 3;
+            sailCtx.beginPath(); sailCtx.moveTo(70, 60); sailCtx.lineTo(70 + Math.sin(sa)*28, 60 + Math.cos(sa)*28); sailCtx.stroke();
+        }
+
+        let time = 0;
+        function render() {
+            time += 0.03;
+
+            // Sterzata
+            if (keys['a'] || keys['arrowleft']) state.heading -= 0.8;
+            if (keys['d'] || keys['arrowright']) state.heading += 0.8;
+            if (keys['w'] || keys['arrowup']) state.sailTrim = Math.max(0.1, state.sailTrim - 0.01);
+            if (keys['s'] || keys['arrowdown']) state.sailTrim = Math.min(1.0, state.sailTrim + 0.01);
+
+            // Avanzamento
+            const player = opponents.find(o => o.isPlayer);
+            player.heading = state.heading;
+            const rad = state.heading * Math.PI / 180;
+            player.x += Math.sin(rad) * 1.5;
+            player.y -= Math.cos(rad) * 1.5;
+
+            // Avanzamento concorrenti
+            opponents.forEach(op => {
+                if (!op.isPlayer) {
+                    const r = op.heading * Math.PI / 180;
+                    op.x += Math.sin(r) * 1.4;
+                    op.y -= Math.cos(r) * 1.4;
+                }
+            });
+
+            // SFONDO MARE (ONDE ANIMATE)
+            ctx.fillStyle = '#091e3a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Griglia Onde
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+            ctx.lineWidth = 1;
+            const gridOffset = (time * 20) % 40;
+            for (let y = gridOffset; y < canvas.height; y += 40) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            // CENTRAGGIO TELECAMERA SUL GIOCATORE
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+
+            // Disegna tutte le barche
+            opponents.forEach(op => {
+                const screenX = cx + (op.x - player.x);
+                const screenY = cy + (op.y - player.y);
+                drawBoat(screenX, screenY, op.heading, op.isPlayer ? 1.1 : 0.9, op.color, op.name);
+            });
+
+            // Aggiorna Telemetria
+            state.timeSec += 0.016;
+            const m = Math.floor(state.timeSec / 60);
+            const s = (state.timeSec % 60).toFixed(2);
+            document.getElementById('telemetry-time').innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+            document.getElementById('telemetry-hdg').innerText = `${Math.round((state.heading % 360 + 360) % 360).toString().padStart(3, '0')}°`;
+            document.getElementById('telemetry-cog').innerText = `${Math.round((state.heading % 360 + 360) % 360).toString().padStart(3, '0')}°`;
+
+            updateUI();
+            requestAnimationFrame(render);
+        }
+
+        render();
+    </script>
+</body>
+</html>
