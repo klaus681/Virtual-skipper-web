@@ -3,319 +3,257 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Virtual Skipper Web - Regata Simulator</title>
+    <title>Virtual Skipper Web - 3D Sailing Simulator</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Three.js + OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <style>
-        body, html {
+        body {
             margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
             overflow: hidden;
             user-select: none;
-            background-color: #081226;
-            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-            color: #fff;
+            background-color: #0b132b;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
         }
-        #gameCanvas {
-            position: absolute;
-            top: 0;
-            left: 0;
+        #canvas-container {
             width: 100vw;
             height: 100vh;
-            z-index: 1;
+            display: block;
         }
-        .hud-panel {
-            background: rgba(10, 20, 38, 0.88);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.15);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
-            border-radius: 8px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+        }
+        .glass-btn {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            transition: all 0.2s ease;
+        }
+        .glass-btn:hover {
+            background: rgba(51, 65, 85, 0.9);
+            border-color: rgba(56, 189, 248, 0.5);
         }
     </style>
 </head>
 <body>
 
-    <!-- SCENA GRAFICA DEL GIOCO -->
-    <canvas id="gameCanvas"></canvas>
+    <div id="canvas-container"></div>
 
-    <!-- UI TOP-LEFT: CHAT LOG -->
-    <div class="absolute top-4 left-4 z-20 w-80 space-y-1 text-xs pointer-events-auto">
-        <div class="hud-panel p-3 text-gray-300 font-mono text-[11px] leading-relaxed shadow-lg">
-            <div class="text-amber-400 font-semibold mb-1"><i class="fa-solid fa-flag-checkered mr-1"></i> Searching; penalità (31.1)</div>
-            <div class="text-gray-400">Comitato di regata: <span class="text-emerald-400">svalegion</span> è entrato</div>
-            <div class="text-gray-400">Vento attuale: <span class="text-cyan-400">17.1 kn / 242°</span></div>
-        </div>
-    </div>
-
-    <!-- UI TOP-CENTER: SPECTATOR BANNER -->
-    <div class="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 pointer-events-auto">
-        <div class="hud-panel px-6 py-1.5 text-xs font-semibold uppercase tracking-wider text-gray-200 border border-cyan-500/30 flex items-center gap-2">
-            <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            SPETTATORE: <span class="text-cyan-300 font-bold">NiceWater</span> &nbsp;|&nbsp; partecipi alla prossima regata
-        </div>
-    </div>
-
-    <!-- UI TOP-RIGHT: LEADERBOARD -->
-    <div class="absolute top-4 right-4 z-20 w-52 pointer-events-auto">
-        <div class="hud-panel p-2.5 text-xs font-mono">
-            <div class="flex justify-between text-gray-400 border-b border-gray-700/60 pb-1 mb-1.5 font-sans font-bold text-[10px] tracking-wider uppercase">
-                <span>Pos / Barca</span>
-                <span>Gap</span>
-            </div>
-            <ul class="space-y-1">
-                <li class="flex justify-between items-center text-gray-300">
-                    <span><strong class="text-amber-400">1</strong> ky2</span>
-                    <span class="text-gray-400 text-[10px]">0:13.1</span>
-                </li>
-                <li class="flex justify-between items-center bg-cyan-950/60 text-cyan-300 px-1 rounded font-bold">
-                    <span><strong>2</strong> NiceWater <i class="fa-solid fa-user-ninja text-[9px] ml-0.5"></i></span>
-                    <span class="text-cyan-300 text-[10px]">0:22.9</span>
-                </li>
-                <li class="flex justify-between items-center text-gray-300">
-                    <span><strong class="text-gray-400">3</strong> WhoHappened</span>
-                    <span class="text-gray-400 text-[10px]">0:32.0</span>
-                </li>
-                <li class="flex justify-between items-center text-gray-300">
-                    <span><strong class="text-gray-400">4</strong> Joo</span>
-                    <span class="text-gray-400 text-[10px]">0:59.5</span>
-                </li>
-            </ul>
-        </div>
-    </div>
-
-    <!-- BOTTOM INSTRUMENTATION BAR -->
-    <div class="absolute bottom-4 left-4 right-4 z-20 flex justify-between items-end pointer-events-none">
+    <!-- HUD OVERLAY PRIMA VERSIONE -->
+    <div class="absolute inset-0 pointer-events-none flex flex-col justify-between p-6 z-10">
         
-        <!-- RADAR & COMPASS -->
-        <div class="flex items-end gap-3 pointer-events-auto">
-            <div class="hud-panel w-36 h-36 p-2 relative flex flex-col justify-between">
-                <div class="text-[9px] font-mono text-gray-400 absolute top-1 left-2">400 m</div>
-                <canvas id="radarCanvas" width="128" height="128" class="w-full h-full rounded"></canvas>
+        <!-- HEADER / INSTRUMENTS TOP BAR -->
+        <div class="flex justify-between items-start pointer-events-auto">
+            <!-- TACTICAL TELEMETRY DASHBOARD -->
+            <div class="glass-panel rounded-xl p-4 flex gap-6 text-white font-mono text-sm">
+                <div>
+                    <div class="text-xs text-cyan-400 font-sans uppercase tracking-wider font-bold">Speed (BS)</div>
+                    <div class="text-2xl font-bold"><span id="val-speed">0.0</span> <span class="text-xs text-gray-400">kn</span></div>
+                </div>
+                <div class="border-l border-slate-700 pl-6">
+                    <div class="text-xs text-cyan-400 font-sans uppercase tracking-wider font-bold">Heading (HDG)</div>
+                    <div class="text-2xl font-bold"><span id="val-hdg">000</span>°</div>
+                </div>
+                <div class="border-l border-slate-700 pl-6">
+                    <div class="text-xs text-cyan-400 font-sans uppercase tracking-wider font-bold">Wind (TWA / TWS)</div>
+                    <div class="text-2xl font-bold"><span id="val-twa">045</span>° / <span class="text-cyan-300">14 kn</span></div>
+                </div>
+                <div class="border-l border-slate-700 pl-6">
+                    <div class="text-xs text-cyan-400 font-sans uppercase tracking-wider font-bold">VMG</div>
+                    <div class="text-2xl font-bold text-emerald-400"><span id="val-vmg">0.0</span> <span class="text-xs text-gray-400">kn</span></div>
+                </div>
             </div>
 
-            <div class="hud-panel w-36 h-36 p-1 relative flex items-center justify-center">
-                <canvas id="compassCanvas" width="136" height="136" class="w-full h-full"></canvas>
-            </div>
-        </div>
-
-        <!-- TELEMETRY DASHBOARD -->
-        <div class="hud-panel px-6 py-3 pointer-events-auto flex items-center gap-8 font-mono border-cyan-500/40">
-            <div class="text-center border-r border-gray-700/80 pr-6">
-                <div class="text-[10px] text-gray-400 font-sans tracking-widest font-bold">REGATA</div>
-                <div id="telemetry-time" class="text-2xl font-black text-white tracking-tight">10:17.22</div>
-            </div>
-
-            <div class="space-y-0.5 text-xs border-r border-gray-700/80 pr-6">
-                <div class="flex justify-between gap-4"><span class="text-gray-400">TWA</span><span id="telemetry-twa" class="font-bold text-white">167°</span></div>
-                <div class="flex justify-between gap-4"><span class="text-gray-400">TWS</span><span id="telemetry-tws" class="font-bold text-cyan-400">17.1 kn</span></div>
-                <div class="flex justify-between gap-4"><span class="text-gray-400">TWD</span><span id="telemetry-twd" class="font-bold text-white">242°</span></div>
-            </div>
-
-            <div class="space-y-0.5 text-xs border-r border-gray-700/80 pr-6">
-                <div class="flex justify-between gap-4"><span class="text-gray-400">HDG</span><span id="telemetry-hdg" class="font-bold text-white">075°</span></div>
-                <div class="flex justify-between gap-4"><span class="text-gray-400">COG</span><span id="telemetry-cog" class="font-bold text-white">075°</span></div>
-            </div>
-
-            <div class="space-y-0.5 text-xs">
-                <div class="flex justify-between gap-6"><span class="text-gray-400">BS</span><span id="telemetry-bs" class="font-bold text-emerald-400">13.7 kn</span></div>
-                <div class="flex justify-between gap-6"><span class="text-gray-400">SOG</span><span id="telemetry-sog" class="font-bold text-white">13.6 kn</span></div>
+            <!-- CONTROLS & CAMERA SELECTOR -->
+            <div class="glass-panel rounded-xl p-3 flex gap-2">
+                <button id="cam-chase" class="glass-btn text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-cyan-400">
+                    <i class="fa-solid fa-video"></i> Chase Cam
+                </button>
+                <button id="cam-tactical" class="glass-btn text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5">
+                    <i class="fa-solid fa-eye"></i> Vista Tattica
+                </button>
             </div>
         </div>
 
-        <!-- SAIL TRIM -->
-        <div class="hud-panel w-40 h-40 p-2 pointer-events-auto flex flex-col items-center justify-center relative">
-            <div class="text-[10px] font-sans font-bold text-gray-400 absolute top-1.5 left-2">VELE / TRIM</div>
-            <canvas id="sailTrimCanvas" width="140" height="140" class="w-full h-full"></canvas>
+        <!-- BOTTOM CONTROLS & COMPASS -->
+        <div class="flex justify-between items-end pointer-events-auto">
+            <!-- KEYBOARD CONTROLS GUIDE -->
+            <div class="glass-panel rounded-xl p-4 text-xs text-gray-200 space-y-1.5 font-mono">
+                <div class="font-bold text-cyan-400 font-sans mb-1 uppercase tracking-wider">Controlli Tastiera</div>
+                <div><kbd class="px-2 py-0.5 bg-slate-800 border border-slate-600 rounded text-cyan-300">A</kbd> / <kbd class="px-2 py-0.5 bg-slate-800 border border-slate-600 rounded text-cyan-300">D</kbd> : Timone (Orza / Poggia)</div>
+                <div><kbd class="px-2 py-0.5 bg-slate-800 border border-slate-600 rounded text-cyan-300">W</kbd> / <kbd class="px-2 py-0.5 bg-slate-800 border border-slate-600 rounded text-cyan-300">S</kbd> : Cazza / Lasca Randa</div>
+                <div><kbd class="px-2 py-0.5 bg-slate-800 border border-slate-600 rounded text-cyan-300">Mouse Drag</kbd> : Ruota Telecamera 3D</div>
+            </div>
+
+            <!-- ANEMOMETER DIAL MINI-WIDGET -->
+            <div class="glass-panel rounded-full w-28 h-28 flex items-center justify-center relative shadow-2xl">
+                <div class="text-[10px] font-bold text-cyan-400 absolute top-2 uppercase">Vento</div>
+                <i id="wind-arrow" class="fa-solid fa-long-arrow-down text-3xl text-cyan-400 transition-transform duration-200"></i>
+                <div class="text-xs font-mono font-bold text-white absolute bottom-2">14 kn</div>
+            </div>
         </div>
     </div>
 
-    <!-- CONTROLS HELP -->
-    <div class="absolute bottom-48 left-4 z-10 pointer-events-auto opacity-75">
-        <div class="hud-panel px-3 py-2 text-[10px] text-gray-300 space-y-1 font-mono">
-            <div><kbd class="px-1 bg-gray-700 rounded">A</kbd> / <kbd class="px-1 bg-gray-700 rounded">D</kbd> : Timone (Orza/Poggia)</div>
-            <div><kbd class="px-1 bg-gray-700 rounded">W</kbd> / <kbd class="px-1 bg-gray-700 rounded">S</kbd> : Cazza / Lasca Randa</div>
-        </div>
-    </div>
-
+    <!-- APPLICATION CODE -->
     <script>
-        // --- GAME ENGINE NATIVO HTML5 ---
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
-
-        const state = {
-            heading: 75,
-            boatSpeed: 13.7,
-            sailTrim: 0.5,
-            timeSec: 617.22,
-            twd: 242
+        // GAME STATE
+        const boatState = {
+            heading: 0,         // Gradi (0 - 360)
+            speed: 0,           // Nodi
+            rudder: 0,          // -1 (sinistra) a 1 (destra)
+            sailTrim: 0.5,      // 0 (cazzata) a 1 (lasciata)
+            windDir: 45,        // Direzione vento (45 gradi)
+            windSpeed: 14       // Nodi
         };
 
-        const opponents = [
-            { id: 'ky2', name: '🇨🇦 ky2', x: 80, y: -120, heading: 72, color: '#ef4444' },
-            { id: 'NiceWater', name: '🇺🇸 NiceWater', x: 0, y: 0, heading: 75, isPlayer: true, color: '#38bdf8' },
-            { id: 'WhoHappened', name: '🇺🇸 WhoHappened', x: -60, y: 90, heading: 77, color: '#ef4444' },
-            { id: 'Joe', name: '🇺🇸 Joe', x: -220, y: -80, heading: 70, color: '#ef4444' }
-        ];
+        // SCENE SETUP
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1e293b);
+        scene.fog = new THREE.FogExp2(0x1e293b, 0.002);
 
-        // INPUTS
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(0, 8, -18);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 - 0.02;
+
+        // LIGHTS
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        dirLight.position.set(100, 150, 50);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // MARE 3D
+        const waterGeo = new THREE.PlaneGeometry(1000, 1000, 64, 64);
+        const waterMat = new THREE.MeshStandardMaterial({
+            color: 0x0f4c81,
+            roughness: 0.1,
+            metalness: 0.8,
+            wireframe: false
+        });
+        const water = new THREE.Mesh(waterGeo, waterMat);
+        water.rotation.x = -Math.PI / 2;
+        scene.add(water);
+
+        // SCAFO & BARCA 3D
+        const boatGroup = new THREE.Group();
+
+        // Hull
+        const hullGeo = new THREE.ConeGeometry(1.8, 8, 8);
+        hullGeo.rotateX(Math.PI / 2);
+        hullGeo.scale(1, 0.5, 1);
+        const hullMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.2 });
+        const hull = new THREE.Mesh(hullGeo, hullMat);
+        hull.position.y = 0.4;
+        boatGroup.add(hull);
+
+        // Mast
+        const mastGeo = new THREE.CylinderGeometry(0.08, 0.1, 9);
+        const mastMat = new THREE.MeshStandardMaterial({ color: 0x0f172a });
+        const mast = new THREE.Mesh(mastGeo, mastMat);
+        mast.position.set(0, 4.5, 0.5);
+        boatGroup.add(mast);
+
+        // Main Sail
+        const sailShape = new THREE.Shape();
+        sailShape.moveTo(0, 0);
+        sailShape.lineTo(0, 7.5);
+        sailShape.lineTo(-3.2, 0.8);
+        sailShape.closePath();
+        const sailGeo = new THREE.ShapeGeometry(sailShape);
+        const sailMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, side: THREE.DoubleSide, roughness: 0.3 });
+        const mainSail = new THREE.Mesh(sailGeo, sailMat);
+        mainSail.position.set(0, 0.8, 0.5);
+        boatGroup.add(mainSail);
+
+        scene.add(boatGroup);
+
+        // CONTROLLI TASTIERA
         const keys = {};
         window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
         window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
-        // HUD CANVASES
-        const radarCanvas = document.getElementById('radarCanvas');
-        const radarCtx = radarCanvas.getContext('2d');
-        const compassCanvas = document.getElementById('compassCanvas');
-        const compassCtx = compassCanvas.getContext('2d');
-        const sailCanvas = document.getElementById('sailTrimCanvas');
-        const sailCtx = sailCanvas.getContext('2d');
+        // CAMERA MODE TOGGLE
+        document.getElementById('cam-chase').addEventListener('click', () => {
+            camera.position.set(0, 8, -18);
+        });
+        document.getElementById('cam-tactical').addEventListener('click', () => {
+            camera.position.set(0, 35, -50);
+        });
 
-        function drawBoat(x, y, heading, scale, color, name) {
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.rotate((heading - 90) * Math.PI / 180);
+        // LOOP DI SIMULAZIONE E RENDERING
+        const clock = new THREE.Clock();
 
-            // Scafo Prospettico
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.moveTo(25 * scale, 0);
-            ctx.quadraticCurveTo(0, -10 * scale, -25 * scale, -8 * scale);
-            ctx.lineTo(-25 * scale, 8 * scale);
-            ctx.quadraticCurveTo(0, 10 * scale, 25 * scale, 0);
-            ctx.fill();
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = clock.getDelta();
 
-            // Vele
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-            ctx.beginPath();
-            ctx.moveTo(5 * scale, 0);
-            ctx.lineTo(-20 * scale, -14 * scale);
-            ctx.lineTo(-15 * scale, 0);
-            ctx.closePath();
-            ctx.fill();
+            // Timone (A/D)
+            if (keys['a']) boatState.heading -= 40 * dt;
+            if (keys['d']) boatState.heading += 40 * dt;
 
-            ctx.restore();
+            // Normalizza Heading (0-360)
+            boatState.heading = (boatState.heading % 360 + 360) % 360;
 
-            // Nome sopra la barca
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 11px Inter, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(name, x, y - 22 * scale);
+            // Trim Vele (W/S)
+            if (keys['w']) boatState.sailTrim = Math.max(0.0, boatState.sailTrim - 0.5 * dt);
+            if (keys['s']) boatState.sailTrim = Math.min(1.0, boatState.sailTrim + 0.5 * dt);
+
+            // Calcolo Fisica Nautica Semplificata
+            const twa = Math.abs(((boatState.heading - boatState.windDir + 180) % 360) - 180);
+            const targetSpeed = Math.sin(twa * Math.PI / 180) * 8.5;
+            boatState.speed += (targetSpeed - boatState.speed) * 0.05;
+
+            // Movimento Barca nel Mondo 3D
+            const rad = boatState.heading * Math.PI / 180;
+            boatGroup.rotation.y = -rad;
+            boatGroup.position.x += Math.sin(rad) * boatState.speed * dt * 0.8;
+            boatGroup.position.z += Math.cos(rad) * boatState.speed * dt * 0.8;
+
+            // Angolo Randa rispetto al vento
+            mainSail.rotation.y = (boatState.sailTrim - 0.5) * 1.4;
+
+            // Segui barca con la telecamera
+            controls.target.copy(boatGroup.position);
+
+            // Aggiorna Interfaccia Utente TELEMETRIA
+            document.getElementById('val-speed').innerText = boatState.speed.toFixed(1);
+            document.getElementById('val-hdg').innerText = Math.round(boatState.heading).toString().padStart(3, '0');
+            document.getElementById('val-twa').innerText = Math.round(twa).toString().padStart(3, '0');
+            document.getElementById('val-vmg').innerText = (boatState.speed * Math.cos(twa * Math.PI / 180)).toFixed(1);
+            document.getElementById('wind-arrow').style.transform = `rotate(${boatState.windDir - boatState.heading}deg)`;
+
+            controls.update();
+            renderer.render(scene, camera);
         }
 
-        function updateUI() {
-            // Radar
-            radarCtx.fillStyle = '#06101e';
-            radarCtx.fillRect(0, 0, 128, 128);
-            radarCtx.strokeStyle = 'rgba(255,255,255,0.2)';
-            radarCtx.beginPath(); radarCtx.arc(64, 64, 40, 0, Math.PI*2); radarCtx.stroke();
-            
-            const player = opponents.find(o => o.isPlayer);
-            opponents.forEach(op => {
-                const rx = 64 + (op.x - player.x) * 0.3;
-                const ry = 64 + (op.y - player.y) * 0.3;
-                radarCtx.fillStyle = op.isPlayer ? '#38bdf8' : '#ef4444';
-                radarCtx.beginPath(); radarCtx.arc(rx, ry, 3, 0, Math.PI*2); radarCtx.fill();
-            });
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
 
-            // Compass
-            compassCtx.clearRect(0, 0, 136, 136);
-            compassCtx.save();
-            compassCtx.translate(68, 68);
-            compassCtx.rotate(-state.heading * Math.PI / 180);
-            compassCtx.strokeStyle = '#fff';
-            compassCtx.beginPath(); compassCtx.arc(0, 0, 50, 0, Math.PI*2); compassCtx.stroke();
-            compassCtx.fillStyle = '#fff'; compassCtx.font = '10px monospace'; compassCtx.fillText('N', -3, -38);
-            compassCtx.restore();
-
-            // Sail Trim
-            sailCtx.clearRect(0, 0, 140, 140);
-            sailCtx.strokeStyle = '#fff';
-            sailCtx.beginPath(); sailCtx.ellipse(70, 70, 12, 36, 0, 0, Math.PI*2); sailCtx.stroke();
-            const sa = (state.sailTrim - 0.5) * 1.2;
-            sailCtx.strokeStyle = '#22c55e'; sailCtx.lineWidth = 3;
-            sailCtx.beginPath(); sailCtx.moveTo(70, 60); sailCtx.lineTo(70 + Math.sin(sa)*28, 60 + Math.cos(sa)*28); sailCtx.stroke();
-        }
-
-        let time = 0;
-        function render() {
-            time += 0.03;
-
-            // Sterzata
-            if (keys['a'] || keys['arrowleft']) state.heading -= 0.8;
-            if (keys['d'] || keys['arrowright']) state.heading += 0.8;
-            if (keys['w'] || keys['arrowup']) state.sailTrim = Math.max(0.1, state.sailTrim - 0.01);
-            if (keys['s'] || keys['arrowdown']) state.sailTrim = Math.min(1.0, state.sailTrim + 0.01);
-
-            // Avanzamento
-            const player = opponents.find(o => o.isPlayer);
-            player.heading = state.heading;
-            const rad = state.heading * Math.PI / 180;
-            player.x += Math.sin(rad) * 1.5;
-            player.y -= Math.cos(rad) * 1.5;
-
-            // Avanzamento concorrenti
-            opponents.forEach(op => {
-                if (!op.isPlayer) {
-                    const r = op.heading * Math.PI / 180;
-                    op.x += Math.sin(r) * 1.4;
-                    op.y -= Math.cos(r) * 1.4;
-                }
-            });
-
-            // SFONDO MARE (ONDE ANIMATE)
-            ctx.fillStyle = '#091e3a';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Griglia Onde
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
-            ctx.lineWidth = 1;
-            const gridOffset = (time * 20) % 40;
-            for (let y = gridOffset; y < canvas.height; y += 40) {
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(canvas.width, y);
-                ctx.stroke();
-            }
-
-            // CENTRAGGIO TELECAMERA SUL GIOCATORE
-            const cx = canvas.width / 2;
-            const cy = canvas.height / 2;
-
-            // Disegna tutte le barche
-            opponents.forEach(op => {
-                const screenX = cx + (op.x - player.x);
-                const screenY = cy + (op.y - player.y);
-                drawBoat(screenX, screenY, op.heading, op.isPlayer ? 1.1 : 0.9, op.color, op.name);
-            });
-
-            // Aggiorna Telemetria
-            state.timeSec += 0.016;
-            const m = Math.floor(state.timeSec / 60);
-            const s = (state.timeSec % 60).toFixed(2);
-            document.getElementById('telemetry-time').innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
-            document.getElementById('telemetry-hdg').innerText = `${Math.round((state.heading % 360 + 360) % 360).toString().padStart(3, '0')}°`;
-            document.getElementById('telemetry-cog').innerText = `${Math.round((state.heading % 360 + 360) % 360).toString().padStart(3, '0')}°`;
-
-            updateUI();
-            requestAnimationFrame(render);
-        }
-
-        render();
+        animate();
     </script>
 </body>
 </html>
