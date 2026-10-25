@@ -8,9 +8,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Three.js CDN Stabile -->
-    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
-    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <style>
         body, html {
             margin: 0;
@@ -19,11 +16,11 @@
             height: 100%;
             overflow: hidden;
             user-select: none;
-            background-color: #0b132b;
+            background-color: #081226;
             font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
             color: #fff;
         }
-        #canvas-container {
+        #gameCanvas {
             position: absolute;
             top: 0;
             left: 0;
@@ -43,8 +40,8 @@
 </head>
 <body>
 
-    <!-- SCENA 3D CANVAS -->
-    <div id="canvas-container"></div>
+    <!-- SCENA GRAFICA DEL GIOCO -->
+    <canvas id="gameCanvas"></canvas>
 
     <!-- UI TOP-LEFT: CHAT LOG -->
     <div class="absolute top-4 left-4 z-20 w-80 space-y-1 text-xs pointer-events-auto">
@@ -121,30 +118,4 @@
 
             <div class="space-y-0.5 text-xs border-r border-gray-700/80 pr-6">
                 <div class="flex justify-between gap-4"><span class="text-gray-400">HDG</span><span id="telemetry-hdg" class="font-bold text-white">075°</span></div>
-                <div class="flex justify-between gap-4"><span class="text-gray-400">COG</span><span id="telemetry-cog" class="font-bold text-white">075°</span></div>
-            </div>
-
-            <div class="space-y-0.5 text-xs">
-                <div class="flex justify-between gap-6"><span class="text-gray-400">BS</span><span id="telemetry-bs" class="font-bold text-emerald-400">13.7 kn</span></div>
-                <div class="flex justify-between gap-6"><span class="text-gray-400">SOG</span><span id="telemetry-sog" class="font-bold text-white">13.6 kn</span></div>
-            </div>
-        </div>
-
-        <!-- SAIL TRIM -->
-        <div class="hud-panel w-40 h-40 p-2 pointer-events-auto flex flex-col items-center justify-center relative">
-            <div class="text-[10px] font-sans font-bold text-gray-400 absolute top-1.5 left-2">VELE / TRIM</div>
-            <canvas id="sailTrimCanvas" width="140" height="140" class="w-full h-full"></canvas>
-        </div>
-    </div>
-
-    <!-- CONTROLS HELP -->
-    <div class="absolute bottom-48 left-4 z-10 pointer-events-auto opacity-75">
-        <div class="hud-panel px-3 py-2 text-[10px] text-gray-300 space-y-1 font-mono">
-            <div><kbd class="px-1 bg-gray-700 rounded">A</kbd> / <kbd class="px-1 bg-gray-700 rounded">D</kbd> : Timone (Orza/Poggia)</div>
-            <div><kbd class="px-1 bg-gray-700 rounded">W</kbd> / <kbd class="px-1 bg-gray-700 rounded">S</kbd> : Cazza / Lasca Randa</div>
-            <div><kbd class="px-1 bg-gray-700 rounded">Mouse</kbd> : Ruota / Zoom Vista 3D</div>
-        </div>
-    </div>
-
-    <script>
-        window.addEventListener('load', function() {
+                <div class="flex justify-between gap-4"><span class="text-gray-400">COG</span><span id="telemetry-cog" class="font-bold text-white">075°</span>
